@@ -37,6 +37,9 @@ dependencies:
   typescript:
     specifier: 5.0.4
     version: 5.0.4
+  vanilla:
+    specifier: link:../../huddle01/DAO/sdk/vanilla
+    version: link:../../huddle01/DAO/sdk/vanilla
 
 packages:
 
