@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 import { HuddleClient } from "vanilla";
+import Video from "./components/Video";
 
 export default function Home() {
   const [camStream, setCamStream] = useState<MediaStream>();
@@ -12,10 +13,62 @@ export default function Home() {
     new HuddleClient()
   );
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [meId, setMeId] = useState("");
+
+  const [peerCamTracks, setPeerCamTracks] = useState<{
+    [key: string]: MediaStreamTrack;
+  }>({});
+
+  useEffect(() => {
+    huddleClient.on("lobby:joined", (data) => {
+      console.log("lobby joined successfully", { data });
+    });
+    huddleClient.on("app:cam-on", (stream) => {
+      console.log("Cam on success", { stream });
+    });
+    huddleClient.on("peer:media-on", ({ track, peerId, trackType }) => {
+      console.log("peer:media-on", { peerId, track, trackType });
+
+      if (trackType === "cam")
+        setPeerCamTracks((prev) => ({ ...prev, [peerId]: track }));
+    });
+
+    huddleClient.on("peer:media-off", ({ track, peerId, trackType }) => {
+      console.log("peer:media-off", { peerId, track, trackType });
+
+      if (trackType === "cam")
+        setPeerCamTracks((prev) => {
+          const { [peerId]: peer, ...rest } = prev;
+
+          return rest;
+        });
+    });
+
+    huddleClient.on("room:peer-left", ({ peerId }) => {
+      console.log("room:peer-left", { peerId });
+
+      setPeerCamTracks((prev) => {
+        const { [peerId]: peer, ...rest } = prev;
+
+        return rest;
+      });
+    });
+  }, []);
 
   const roomId = "dic-gsxj-gqv";
   const projectId = "KL1r3E1yHfcrRbXsT4mcE-3mK60Yc3YR";
+
+  const getStream = (_track: MediaStreamTrack) => {
+    const stream = new MediaStream();
+    stream.addTrack(_track);
+    return stream;
+  };
+
+  useEffect(() => {
+    const id = huddleClient.getPeerId();
+
+    setMeId(id);
+  }, []);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
@@ -46,15 +99,16 @@ export default function Home() {
         </div>
       </div>
 
-      <div>
-        <div className="overflow-hidden bg-zinc-950 rounded-xl aspect-video h-64">
-          <video
-            className="w-full h-full object-cover"
-            ref={videoRef}
-            autoPlay
-            muted
-          ></video>
-        </div>
+      <div className="flex gap-4 flex-wrap justify-center">
+        <Video peerId={meId || "meId"} stream={camStream} />
+
+        {Object.keys(peerCamTracks).map((key) => (
+          <Video
+            key={key}
+            peerId={key}
+            stream={getStream(peerCamTracks[key])}
+          />
+        ))}
       </div>
 
       <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 gap-4 lg:text-left">
@@ -67,17 +121,30 @@ export default function Home() {
         >
           joinLobby()
         </button>
+
+        <button
+          onClick={huddleClient.joinRoom}
+          className="bg-blue-500 text-white py-3 px-4 rounded-lg text-xl"
+        >
+          joinRoom()
+        </button>
+        <button
+          onClick={() => huddleClient.leaveLobby()}
+          className="bg-red-500 text-white py-3 px-4 rounded-lg text-xl"
+        >
+          leaveLobby()
+        </button>
+        <button
+          onClick={() => huddleClient.leaveRoom()}
+          className="bg-red-500 text-white py-3 px-4 rounded-lg text-xl"
+        >
+          leaveRoom()
+        </button>
         <button
           onClick={async () => {
             try {
               const stream = await huddleClient.enableCam();
               setCamStream(stream);
-
-              if (videoRef.current) {
-                console.log({ stream });
-
-                videoRef.current.srcObject = stream;
-              }
             } catch (error) {
               console.log({ error });
             }
@@ -86,12 +153,14 @@ export default function Home() {
         >
           enableWebcam()
         </button>
+
         <button
-          onClick={huddleClient.joinRoom}
+          onClick={huddleClient.disableCam}
           className="bg-blue-500 text-white py-3 px-4 rounded-lg text-xl"
         >
-          joinRoom()
+          disableCam()
         </button>
+
         <button
           onClick={() => huddleClient.produceCam()}
           className="bg-blue-500 text-white py-3 px-4 rounded-lg text-xl"
@@ -102,7 +171,32 @@ export default function Home() {
           onClick={() => huddleClient.stopProducingCam()}
           className="bg-blue-500 text-white py-3 px-4 rounded-lg text-xl"
         >
-          stopProducing()
+          stopProducingCam()
+        </button>
+
+        <button
+          onClick={() => huddleClient.enableMic()}
+          className="bg-blue-500 text-white py-3 px-4 rounded-lg text-xl"
+        >
+          enableMic()
+        </button>
+        <button
+          onClick={() => huddleClient.disableMic()}
+          className="bg-blue-500 text-white py-3 px-4 rounded-lg text-xl"
+        >
+          disableMic()
+        </button>
+        <button
+          onClick={() => huddleClient.produceMic()}
+          className="bg-blue-500 text-white py-3 px-4 rounded-lg text-xl"
+        >
+          produceMic()
+        </button>
+        <button
+          onClick={() => huddleClient.stopProducingMic()}
+          className="bg-blue-500 text-white py-3 px-4 rounded-lg text-xl"
+        >
+          stopProducingMic()
         </button>
       </div>
     </main>
